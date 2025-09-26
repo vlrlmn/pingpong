@@ -1,0 +1,3 @@
+[submodule "mmr"]
+	path = mmr
+	url = https://github.com/vlrlmn/mmrs
