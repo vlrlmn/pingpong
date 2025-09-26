@@ -1,0 +1,114 @@
+services:
+  radish:
+    container_name: radish
+    init: true
+    build: ./radish
+    environment:
+      - PORT=$RADISH_PORT
+    ports:
+      - "$RADISH_PORT:$RADISH_PORT"
+
+  email_sender_service:
+    container_name: ess
+    init: true
+    build: ./email_sender_service
+    environment:
+      - ESS_PORT=$ESS_PORT
+      - ESS_PASS=$ESS_PASS
+      - ESS_EMAIL=$ESS_EMAIL
+    env_file:
+      - .env
+    ports:
+      - "$ESS_PORT:$ESS_PORT"
+  
+  user-management-service:
+    depends_on:
+      - radish
+      - email_sender_service
+    container_name: ums
+    init: true
+    build: ./user-management-service
+    environment:
+      - PORT=$UMS_PORT
+      - JWT_SECRET=$JWT_SECRET
+      - JWT_SALT=$JWT_SALT
+      - JWT_ACCESS_EXPIRES_IN=$JWT_ACCESS_EXPIRES_IN
+      - JWT_REFRESH_EXPIRES_IN=$JWT_REFRESH_EXPIRES_IN
+      - GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+      - RADISH_HOST=radish
+      - RADISH_PORT=$RADISH_PORT
+      - ESS_HOST=ess
+      - ESS_PORT=$ESS_PORT
+      - WEBSITE_URL=$WEBSITE_URL
+    env_file:
+      - .env
+    volumes:
+      - db-data:/app/db
+      - avatars:/app/public/avatars
+    ports:
+      - "$UMS_PORT:$UMS_PORT"
+
+  game-service:
+    depends_on:
+      - radish
+      - user-management-service
+    container_name: game
+    init: true
+    build: ./game
+    environment:
+      - PORT=$GS_PORT
+      - JWT_SECRET=$JWT_SECRET
+      - JWT_SALT=$JWT_SALT
+      - RADISH_HOST=radish
+      - RADISH_PORT=$RADISH_PORT
+      - POINTS_TO_WIN=$POINTS_TO_WIN
+      - MMRS_ADDR=mmrs:${MMRS_PORT}/mmrs
+    env_file:
+      - .env
+    ports:
+      - "$GS_PORT:$GS_PORT"
+
+  frontendy:
+    container_name: frontendy
+    init: true
+    build: ./frontendy
+    environment:
+      PORT: ${FR_PORT}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI}
+      UMS_ADDR: "${DOMAIN}:${UMS_PORT}/auth"
+      MMRS_ADDR: "${DOMAIN}:${MMRS_PORT}/mmrs"
+      GAME_ADDR: "${DOMAIN}:${GS_PORT}/game"
+      SECURE: ${SECURE}
+    env_file:
+      - .env
+    ports:
+      - "$FR_PORT:$FR_PORT"
+
+  mmrs:
+    container_name: mmrs
+    init: true
+    build: ./mmrs
+    environment:
+      PORT: ${MMRS_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_SALT: ${JWT_SALT}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+      RADISH_HOST: radish
+      RADISH_PORT: ${RADISH_PORT}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
+      UMS_ADDR: "ums:${UMS_PORT}/auth"
+      GAME_ADDR: "game:${GS_PORT}/game"
+    env_file:
+      - .env
+    ports:
+      - "$MMRS_PORT:$MMRS_PORT"
+    volumes:
+      - mmrs-db-data:/app/db
+
+volumes:
+  db-data:
+  avatars:
+  mmrs-db-data:
